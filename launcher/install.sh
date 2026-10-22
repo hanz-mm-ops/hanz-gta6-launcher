@@ -5,7 +5,8 @@
 set -e
 cd "${0:A:h}"
 [[ -n "$1" ]] || { echo "Usage: $0 <tv-ip>"; exit 1; }
-export ANDROID_SERIAL="$1:5555"
+# Accepts "ip" (classic port 5555) or "ip:port" (Wireless debugging).
+export ANDROID_SERIAL="$1"; [[ "$1" == *:* ]] || ANDROID_SERIAL="$1:5555"
 adb connect "$ANDROID_SERIAL" >/dev/null
 
 [[ -f build/Home.apk ]] || ./build.sh

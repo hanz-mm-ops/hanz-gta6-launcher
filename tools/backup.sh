@@ -4,7 +4,8 @@
 # Usage: tools/backup.sh <tv-ip> [package ...]
 set -e
 [[ -n "$1" ]] || { echo "Usage: $0 <tv-ip> [package ...]"; exit 1; }
-export ANDROID_SERIAL="$1:5555"; shift
+# Accepts "ip" (classic port 5555) or "ip:port" (Wireless debugging).
+export ANDROID_SERIAL="$1"; [[ "$1" == *:* ]] || ANDROID_SERIAL="$1:5555"; shift
 adb connect "$ANDROID_SERIAL" >/dev/null
 D="backups/$(date +%Y%m%d-%H%M%S)"; mkdir -p "$D/apks"
 adb shell pm list packages -f -U > "$D/packages-all.txt"

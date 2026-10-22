@@ -14,6 +14,8 @@ a matching screen saver. Built on [Glass TV Home](#glass-tv-home) (MIT).
 
 1. On the TV: *Settings → Device Preferences → About → Build*, press OK seven times, then turn on
    **USB debugging** in *Developer options*. Note the TV's IP (*Settings → Network*).
+   On Google TV (Android 11+), also open *Developer options → Wireless debugging → Pair device with
+   pairing code*. Keep that screen open: Claude needs the six-digit code and the `IP:port` shown there.
 2. In [Claude Code](https://claude.com/claude-code) on a Mac on the same Wi-Fi, paste:
 
 ```text
@@ -38,7 +40,9 @@ brew install openjdk@17
 JAVA_HOME=/opt/homebrew/opt/openjdk@17 sdkmanager --licenses
 JAVA_HOME=/opt/homebrew/opt/openjdk@17 sdkmanager "build-tools;36.0.0" "platforms;android-36"
 git clone https://github.com/hanz-mm-ops/hanz-gta6-launcher && cd hanz-gta6-launcher
-tools/backup.sh TV_IP        # snapshot before changes
+adb pair TV_IP:PAIR_PORT CODE   # Google TV: from "Pair device with pairing code"
+adb mdns services               # shows the TV's connect address, e.g. 192.168.0.109:46777
+tools/backup.sh TV_IP        # snapshot before changes (TV_IP or TV_IP:port)
 launcher/install.sh TV_IP    # download art, build, install, set as home
 ```
 

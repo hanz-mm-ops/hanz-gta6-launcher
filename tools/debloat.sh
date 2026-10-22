@@ -4,7 +4,8 @@
 # Usage: tools/debloat.sh <tv-ip> <package-list-file>
 set -e
 [[ -n "$2" ]] || { echo "Usage: $0 <tv-ip> <package-list-file>"; exit 1; }
-export ANDROID_SERIAL="$1:5555"
+# Accepts "ip" (classic port 5555) or "ip:port" (Wireless debugging).
+export ANDROID_SERIAL="$1"; [[ "$1" == *:* ]] || ANDROID_SERIAL="$1:5555"
 adb connect "$ANDROID_SERIAL" >/dev/null
 grep -v '^\s*#' "$2" | awk '{print $1}' | grep . | while read p; do
   printf "%-50s " "$p"

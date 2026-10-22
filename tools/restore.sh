@@ -5,7 +5,8 @@
 #   e.g. tools/restore.sh 192.168.1.50 my-bloat.txt com.vendor.launcher/.MainActivity
 set -e
 [[ -n "$3" ]] || { echo "Usage: $0 <tv-ip> <package-list-file> <original-home-activity>"; exit 1; }
-export ANDROID_SERIAL="$1:5555"
+# Accepts "ip" (classic port 5555) or "ip:port" (Wireless debugging).
+export ANDROID_SERIAL="$1"; [[ "$1" == *:* ]] || ANDROID_SERIAL="$1:5555"
 adb connect "$ANDROID_SERIAL" >/dev/null
 grep -v '^\s*#' "$2" | awk '{print $1}' | grep . | while read p; do
   adb shell cmd package install-existing "$p" >/dev/null 2>&1 || true

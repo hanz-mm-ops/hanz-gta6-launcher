@@ -4,7 +4,8 @@
 # Usage: tools/set-dock.sh <tv-ip> "<dock,comma,separated>" ["<below,dock>"]
 set -e
 [[ -n "$2" ]] || { echo "Usage: $0 <tv-ip> \"pkg1,pkg2,...\" [\"pkgA,pkgB\"]"; exit 1; }
-export ANDROID_SERIAL="$1:5555"
+# Accepts "ip" (classic port 5555) or "ip:port" (Wireless debugging).
+export ANDROID_SERIAL="$1"; [[ "$1" == *:* ]] || ANDROID_SERIAL="$1:5555"
 adb connect "$ANDROID_SERIAL" >/dev/null
 args=(--es app.tvshell.DOCK "$2")
 [[ -n "$3" ]] && args+=(--es app.tvshell.GRID "$3")
