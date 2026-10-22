@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Line icon in the reference's style (24×24 viewBox, round caps). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="#00000000" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.8"
+        android:strokeLineCap="round" android:strokeLineJoin="round"
+        android:pathData="M6 11h4M8 9v4M15 12h.01M18 10h.01M17.32 5H6.68a4 4 0 0 0-3.98 3.59l-.6 6A3 3 0 0 0 5.08 18c1 0 1.95-.5 2.5-1.33L9 15h6l1.42 1.67A3 3 0 0 0 18.92 18a3 3 0 0 0 2.98-3.41l-.6-6A4 4 0 0 0 17.32 5z" />
+</vector>

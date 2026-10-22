@@ -1,0 +1,19 @@
+build/
+*.apk
+backups/
+logs/
+bootvideo/originals/
+bootvideo/render
+bootvideo/*.mp4
+bootvideo/*.jpg
+.DS_Store
+
+# Claude / editor
+.claude/
+
+# GTA VI artwork, logo and video belong to Rockstar Games; launcher/fetch-art.sh downloads them.
+launcher/res/drawable-nodpi/vice_background.jpg
+launcher/res/drawable-nodpi/vice_art_*.jpg
+launcher/res/drawable-nodpi/vice_logo.png
+launcher/res/raw/vice_skyline.mp4
+launcher/res/drawable-nodpi/*.src
