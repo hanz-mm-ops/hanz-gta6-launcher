@@ -20,7 +20,9 @@ adb shell pm grant app.tvshell android.permission.ACCESS_FINE_LOCATION || true
 adb shell pm grant app.tvshell android.permission.BLUETOOTH_CONNECT || true
 echo "• permissions (Continue Watching: Watch Next, recently used apps)"
 adb shell pm grant app.tvshell com.android.providers.tv.permission.READ_EPG_DATA 2>/dev/null || true
-adb shell appops set app.tvshell GET_USAGE_STATS allow || true
+adb shell appops set app.tvshell android:get_usage_stats allow || adb shell appops set app.tvshell GET_USAGE_STATS allow || true
+
+adb shell cmd notification allow_listener app.tvshell/app.tvshell.MediaWatcher || true
 
 echo "• screen saver"
 adb shell settings put secure screensaver_components app.tvshell/.AerialDream

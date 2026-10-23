@@ -282,4 +282,44 @@ final class ViceData {
         long d = h / 24;
         return d == 1 ? "Opened yesterday" : "Opened " + d + " days ago";
     }
+
+    // ---------------------------------------------------------------- last watched per app
+
+    /** What MediaWatcher saw last in each app, newest first, one per app; music apps left out. */
+    static List<Watch> lastWatched(Context c, int max) {
+        List<Watch> out = new ArrayList<>();
+        android.content.pm.PackageManager pm = c.getPackageManager();
+        for (Map.Entry<String, ?> e : c.getSharedPreferences(MediaWatcher.PREFS, Context.MODE_PRIVATE).getAll().entrySet()) {
+            JSONObject o = MediaWatcher.read(String.valueOf(e.getValue()));
+            if (o == null) continue;
+            String pkg = e.getKey();
+            try {
+                if (pm.getApplicationInfo(pkg, 0).category == android.content.pm.ApplicationInfo.CATEGORY_AUDIO) continue;
+            } catch (android.content.pm.PackageManager.NameNotFoundException gone) {
+                continue;
+            }
+            Watch w = new Watch();
+            w.pkg = pkg;
+            w.title = o.optString("title");
+            w.engaged = o.optLong("at");
+            long dur = o.optLong("duration"), pos = o.optLong("position", -1);
+            String sub = o.optString("sub");
+            if (o.optBoolean("live")) {
+                w.meta = sub.isEmpty() ? "Live now" : sub + " · Live";
+                w.progress = 1f;
+            } else if (dur > 0 && pos >= 0) {
+                long left = Math.max(1, Math.round((dur - pos) / 60000f));
+                w.meta = (sub.isEmpty() ? "" : sub + " · ") + left + " min left";
+                w.progress = Math.max(0f, Math.min(1f, pos / (float) dur));
+            } else {
+                w.meta = sub.isEmpty() ? ago(w.engaged).replace("Opened", "Watched") : sub;
+            }
+            java.io.File art = MediaWatcher.artFile(c, pkg);
+            if (art.exists()) w.poster = Uri.fromFile(art).toString();
+            out.add(w);
+        }
+        out.sort((a, b) -> Long.compare(b.engaged, a.engaged));
+        while (out.size() > max) out.remove(out.size() - 1);
+        return out;
+    }
 }

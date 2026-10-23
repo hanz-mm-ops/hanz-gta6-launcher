@@ -76,17 +76,8 @@ public class HomeActivity extends Activity {
     private static final String YOUTUBE = "com.google.android.youtube.tv";
     private static final String[] VIDEO_APPS = {YOUTUBE, "com.netflix.ninja", "com.amazon.amazonvideo.livingroom",
             "com.disney.disneyplus", "com.apple.atve.androidtv.appletv", "com.wbd.stream", "net.mbc.shahid",
-            "com.google.android.videos", "com.plexapp.android", "org.xbmc.kodi", "com.osn.go", "com.starzplay.tv"};
-
-    /** Smart Home cards from the spec: name, icon, kind (light/air/tv/offline). */
-    private static final String[][] DEVICES = {
-            {"office_light", "OFFICE LIGHT", "light"},
-            {"bedroom_light", "BEDROOM LIGHT", "light"},
-            {"tv_backlight", "TV BACKLIGHT", "light"},
-            {"office_air", "OFFICE AIR", "air"},
-            {"office_tv", "OFFICE TCL TV", "tv"},
-            {"living_light", "LIVING ROOM LIGHT", "offline"},
-    };
+            "com.google.android.videos", "com.plexapp.android", "org.xbmc.kodi", "com.osn.go", "com.starzplay.tv",
+            "com.stremio.one", "tv.hanz.player", "com.google.android.youtube.tvmusic", "com.wbd.stream", "com.watchit.tv"};
 
     private static final int[][] WATCH_COLORS = {
             {0xFFE8558F, 0xFF4B1A4A}, {0xFFF28A4C, 0xFF5A1F3A}, {0xFF7A3FA0, 0xFF24103A}, {0xFFD9466F, 0xFF3A1236}};
@@ -98,13 +89,13 @@ public class HomeActivity extends Activity {
     private Page page;
     private LinearLayout column;
     private FrameLayout hero;
-    private LinearLayout quickSection, appsSection, watchSection, homeSection, weatherSection;
+    private LinearLayout quickSection, appsSection, watchSection, weatherSection;
     private View footer;
-    private Vice.Grid appGrid, watchGrid, homeGrid;
+    private Vice.Grid appGrid, watchGrid;
     private LinearLayout weatherRows, inputRow;
     private final Text[] countdown = new Text[4];
     private int countdownCount;
-    private Text clock, ampm, today, todayDate, temp, cond, homeCount, weatherTitle;
+    private Text clock, ampm, today, todayDate, temp, cond, weatherTitle;
     private ImageView weatherIcon;
     private View openApps, backToTop;
     private ValueAnimator bob;
@@ -362,8 +353,52 @@ public class HomeActivity extends Activity {
         if (v == hero) target = 0;
         else if (v == footer || v == weatherSection) target = Integer.MAX_VALUE;
         else target = v.getTop();
+        boolean fromHero = page.getScrollY() < hero.getHeight() / 2;
         scrollTo(target);
+        if (v == appsSection && fromHero) revealApps();
     }
+
+    private boolean heroShown = true;
+
+    /**
+     * Leaving the first screen fades its countdown and buttons out in one go (and back in on return),
+     * drawn through a hardware layer so the TV's GPU only composites; the artwork stays put.
+     */
+    private void heroContent(boolean show) {
+        if (hero == null || show == heroShown) return;
+        heroShown = show;
+        for (int i = 2; i < hero.getChildCount(); i++) {   // 0 = artwork, 1 = shading
+            View c = hero.getChildAt(i);
+            c.animate().cancel();
+            if (Ui.reduceMotion) {
+                c.setAlpha(show ? 1f : 0f);
+                c.setTranslationY(0);
+                continue;
+            }
+            c.animate().alpha(show ? 1f : 0f).translationY(show ? 0 : -px(30))
+                    .setStartDelay(show ? 120 : 0).setDuration(show ? 420 : 260)
+                    .setInterpolator(SMOOTH).withLayer().start();
+        }
+    }
+
+    /** Arriving at Your Apps from the top: the cards rise into place in turn, as the scroll settles. */
+    private void revealApps() {
+        if (Ui.reduceMotion) return;
+        for (int i = 0; i < appGrid.getChildCount(); i++) {
+            View c = appGrid.getChildAt(i);
+            int row = i / 5, col = i % 5;
+            c.animate().cancel();
+            c.setAlpha(0f);
+            c.setTranslationY(px(48));
+            c.animate().alpha(1f).translationY(0)
+                    .setStartDelay(160 + row * 90 + col * 40).setDuration(460)
+                    .setInterpolator(SMOOTH).withLayer().start();
+        }
+    }
+
+    /** Fast start, long gentle settle: reads as smooth on a remote. */
+    private static final android.view.animation.Interpolator SMOOTH =
+            new android.view.animation.PathInterpolator(0.22f, 1f, 0.36f, 1f);
 
     private void scrollTo(int y) {
         int max = Math.max(0, column.getHeight() - page.getHeight());
@@ -371,8 +406,9 @@ public class HomeActivity extends Activity {
         if (scrolling != null) scrolling.cancel();
         if (y == page.getScrollY()) return;
         scrolling = ObjectAnimator.ofInt(page, "scrollY", y);
-        scrolling.setDuration(Ui.reduceMotion ? 0 : 450);
-        scrolling.setInterpolator(Vice.EASE);
+        scrolling.setDuration(Ui.reduceMotion ? 0 : 560);
+        scrolling.setInterpolator(SMOOTH);
+        heroContent(y < hero.getHeight() / 2);
         scrolling.start();
     }
 
@@ -412,7 +448,6 @@ public class HomeActivity extends Activity {
         column.addView(buildApps(), fullWidth());
         column.addView(buildWatch(), new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, px(518.2f)));
         column.addView(buildQuick(), fullWidth());
-        column.addView(buildHome(), fullWidth());
         column.addView(buildWeather(), new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, px(846.5f)));
         column.addView(buildFooter(), new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, px(140.5f)));
         root.addView(page, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
@@ -480,7 +515,7 @@ public class HomeActivity extends Activity {
 
         // The logo sits in the top-left corner where the section links used to be.
         // OK on the logo starts the screen saver.
-        Tile logo = Vice.button(this, 12, null, v -> previewSaver());
+        Tile logo = Vice.button(this, 12, null, v -> previewSaver()).lift(4).noRing();
         logo.face.setClipToOutline(false);
         logo.face.addView(new Logo(this, 96));
         hero.addView(logo, lp(Gravity.TOP | Gravity.START, 80, 28, 0, 0));
@@ -488,7 +523,6 @@ public class HomeActivity extends Activity {
         status.height = px(140);
         hero.addView(buildStatus(), status);
         hero.addView(buildCountdown(), new FrameLayout.LayoutParams(px(1600), ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER));
-        hero.addView(buildHeroButtons(), lp(Gravity.BOTTOM | Gravity.START, 80, 0, 0, 120));
         hero.addView(buildInputs(), lp(Gravity.BOTTOM | Gravity.END, 0, 0, 80, 120));
         hero.addView(buildScrollHint(), lp(Gravity.BOTTOM | Gravity.START, 960, 0, 0, 34));
         return hero;
@@ -528,19 +562,13 @@ public class HomeActivity extends Activity {
         return t;
     }
 
-    /** Apps, Watch, Smart Home or the end of the page: scroll there and focus the first thing in it. */
+    /** Apps, Watch or the end of the page: scroll there and focus the first thing in it. */
     private void jump(int which) {
         View target;
         if (which == 0) target = appGrid.getChildCount() > 0 ? appGrid.getChildAt(0) : null;
         else if (which == 1) target = watchGrid.getChildCount() > 0 ? watchGrid.getChildAt(0) : null;
-        else if (which == 2) target = firstFocusable(homeGrid);
         else target = backToTop;
         if (target != null) focus(target);
-    }
-
-    private static View firstFocusable(ViewGroup g) {
-        for (int i = 0; i < g.getChildCount(); i++) if (g.getChildAt(i).isFocusable()) return g.getChildAt(i);
-        return null;
     }
 
     /** Weather and time in one pill, then the Settings button. */
@@ -689,46 +717,46 @@ public class HomeActivity extends Activity {
         }
     }
 
-    private View buildHeroButtons() {
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.TOP);
-        row.setClipChildren(false);
-        row.setClipToPadding(false);
-
-        Tile open = Vice.button(this, 32, new Fill(0, 32, Vice.linear(90, new int[] {Vice.ACCENT_A, Vice.ACCENT_B}, null)),
-                v -> jump(0));
-        LinearLayout openIn = hbox();
-        openIn.setPadding(px(34), 0, px(34), 0);
-        openIn.addView(Vice.icon(this, R.drawable.vice_play_small, 0xFFFFFFFF), size(22, 22, 0));
-        openIn.addView(new Text(this, "OPEN APPS", Vice.INTER_700, 20, 0.06f, 24.5f, 0xFFFFFFFF), wrap(12));
-        open.face.addView(openIn, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        row.addView(open, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, px(64)));
-        openApps = open;
-
-        Tile cont = Vice.button(this, 32, new Fill(0, 32).border(2, white(0.8f)), v -> jump(1));
-        LinearLayout contIn = hbox();
-        contIn.setPadding(px(36), 0, px(36), 0);
-        contIn.addView(new Text(this, "CONTINUE WATCHING", Vice.INTER_700, 20, 0.06f, 24.5f, 0xFFFFFFFF), wrap(0));
-        cont.face.addView(contIn, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, px(68));
-        clp.leftMargin = px(18);
-        row.addView(cont, clp);
-        return row;
+    /**
+     * A first-screen button that is just a word (with an optional icon): no frame and no ring. When
+     * the cursor reaches it, it fills with the accent gradient.
+     */
+    private Tile heroWord(String label, int icon, float textSize, float height, View.OnClickListener click) {
+        Tile t = Vice.button(this, height / 2, null, click).noRing();
+        // Takes the word's size, never asks for more (a bare View would fill all the space offered).
+        View glow = new View(this) {
+            @Override
+            protected void onMeasure(int ws, int hs) {
+                setMeasuredDimension(MeasureSpec.getMode(ws) == MeasureSpec.EXACTLY ? MeasureSpec.getSize(ws) : 0,
+                        MeasureSpec.getMode(hs) == MeasureSpec.EXACTLY ? MeasureSpec.getSize(hs) : 0);
+            }
+        };
+        glow.setBackground(new Fill(0, height / 2, Vice.linear(90, new int[] {Vice.ACCENT_A, Vice.ACCENT_B}, null)));
+        glow.setAlpha(0f);
+        t.face.addView(glow, match());
+        LinearLayout in = hbox();
+        in.setPadding(px(height * 0.45f), 0, px(height * 0.45f), 0);
+        if (icon != 0) in.addView(Vice.icon(this, icon, 0xFFFFFFFF), size(textSize, textSize, 0));
+        Text text = new Text(this, label, Vice.INTER_700, textSize, 0.06f, textSize * 1.22f, white(0.88f))
+                .shadow(2, 12, Vice.argb(0.6f, 20, 4, 24));
+        in.addView(text, wrap(icon != 0 ? 10 : 0));
+        t.face.addView(in, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        t.onProgress(p -> {
+            glow.setAlpha(p);
+            text.color(Vice.mix(white(0.88f), 0xFFFFFFFF, p));
+        });
+        return t;
     }
 
-    /** "INPUT", then Game Mode (the PS5's HDMI port) and AirPlay. */
+    /** Game Mode (the console's HDMI port), AirPlay, Artwork and Settings, as words. */
     private View buildInputs() {
         LinearLayout col = new LinearLayout(this);
         col.setOrientation(LinearLayout.VERTICAL);
         col.setGravity(Gravity.END);
         col.setClipChildren(false);
         col.setClipToPadding(false);
-        col.addView(new Text(this, "INPUT", Vice.INTER_700, 14, 0.26f, 17, white(0.7f)), wrap(0));
         inputRow = hbox();
-        LinearLayout.LayoutParams rlp = wrap(0);
-        rlp.topMargin = px(14);
-        col.addView(inputRow, rlp);
+        col.addView(inputRow, wrap(0));
         populateInputs();
         return col;
     }
@@ -749,35 +777,37 @@ public class HomeActivity extends Activity {
         found.removeIf(in -> !"PS5".equals(in[1]));
         if (found.isEmpty()) found.add(new String[] {"", inputName("HDMI 1")});
         found.add(new String[] {Actions.AIRPLAY_KEY, "AirPlay"});
-        String chosen = Prefs.get(this).getString("vice_input", "");
         for (int i = 0; i < found.size(); i++) {
             String[] in = found.get(i);
-            boolean on = !in[0].isEmpty() && in[0].equals(chosen);
-            // The PS5 port is "Game Mode", in the accent gradient like OPEN APPS.
             boolean game = "PS5".equals(in[1]);
-            Fill fill = game ? new Fill(0, 24, Vice.linear(90, new int[] {Vice.ACCENT_A, Vice.ACCENT_B}, null))
-                    : on ? new Fill(0xFFFFFFFF, 24) : new Fill(Vice.argb(0.25f, 22, 10, 27), 24).border(2, white(0.55f));
-            Tile pill = Vice.button(this, 24, fill, v -> pickInput(in[0], in[1]));
-            Text label = new Text(this, game ? "Game Mode" : in[1], Vice.INTER_700, 17, 0.06f, 20.5f,
-                    on && !game ? Vice.INK : 0xFFFFFFFF);
-            LinearLayout inner = hbox();
-            inner.setPadding(px(game ? 22 : 24), 0, px(game ? 22 : 24), 0);
-            inner.addView(label, wrap(0));
-            pill.face.addView(inner, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            Tile word = heroWord(game ? "GAME MODE" : in[1].toUpperCase(Locale.ROOT), 0, 17, 48,
+                    game ? v -> gameMode() : v -> pickInput(in[0], in[1]));
             LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, px(48));
-            plp.leftMargin = i == 0 ? 0 : px(10);
-            inputRow.addView(pill, plp);
+            plp.leftMargin = i == 0 ? 0 : px(4);
+            inputRow.addView(word, plp);
         }
         // After AirPlay: Artwork opens the background picker.
-        Tile artwork = Vice.button(this, 24, new Fill(Vice.argb(0.25f, 22, 10, 27), 24).border(2, white(0.55f)),
-                v -> pickBackground(Backgrounds.HOME));
-        LinearLayout inner = hbox();
-        inner.setPadding(px(24), 0, px(24), 0);
-        inner.addView(new Text(this, "Artwork", Vice.INTER_700, 17, 0.06f, 20.5f, 0xFFFFFFFF), wrap(0));
-        artwork.face.addView(inner, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        Tile artwork = heroWord("ARTWORK", 0, 17, 48, v -> pickBackground(Backgrounds.HOME));
         LinearLayout.LayoutParams alp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, px(48));
-        alp.leftMargin = px(10);
+        alp.leftMargin = px(4);
         inputRow.addView(artwork, alp);
+        Tile settings = heroWord("SETTINGS", 0, 17, 48, v -> startActivity(new Intent(this, SettingsActivity.class)));
+        LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, px(48));
+        slp.leftMargin = px(4);
+        inputRow.addView(settings, slp);
+        // The first screen opens on Game Mode.
+        if (inputRow.getChildCount() > 0) openApps = inputRow.getChildAt(0);
+    }
+
+    /** Game Mode: the HDMI port a console is plugged into and switched on, else the PS5's port. */
+    private void gameMode() {
+        String[] port = Actions.consoleInput(this, PORT_NAMES);
+        if (port == null) {
+            toast(this, "No console found on HDMI");
+            return;
+        }
+        if (!port[2].equals("connected")) toast(this, "Turn your console on: opening " + port[1]);
+        pickInput(port[0], port[1]);
     }
 
     /** What's plugged into each port, by port number; HDMI 1 is the PS5. */
@@ -797,7 +827,15 @@ public class HomeActivity extends Activity {
             toast(this, label + " isn't available on this TV");
             return;
         }
-        boolean ok = Actions.AIRPLAY_KEY.equals(id) ? Actions.airplay(this)
+        if (Actions.AIRPLAY_KEY.equals(id) && !Actions.airplay(this)) {
+            // TCL and many TVs run AirPlay in the background: there's no screen to open.
+            List<Sheet.Item> how = new ArrayList<>();
+            how.add(new Sheet.Item("On your iPhone or iPad", "Control Center → Screen Mirroring → choose this TV", getDrawable(R.drawable.vice_app_airplay)));
+            how.add(new Sheet.Item("On your Mac", "Control Center → Screen Mirroring → choose this TV", getDrawable(R.drawable.ic_mirror)));
+            sheet = Sheet.show(root, "AirPlay", "Ready on this TV", null, how, i -> {});
+            return;
+        }
+        boolean ok = Actions.AIRPLAY_KEY.equals(id) ? true
                 : Actions.LIVE_TV_KEY.equals(id) ? Actions.liveTv(this) : Actions.switchInput(this, id);
         if (!ok) {
             toast(this, "Couldn't switch to " + label);
@@ -1505,12 +1543,28 @@ public class HomeActivity extends Activity {
         return watchSection;
     }
 
+    /**
+     * The last thing watched in each app: Android TV's Watch Next where it's shared with us, and
+     * otherwise what MediaWatcher saw playing. One card per app; with nothing to show, the
+     * section is hidden.
+     */
     private void loadWatch() {
         if (entries.isEmpty() || watchGrid == null) return;
         new Thread(() -> {
-            List<ViceData.Watch> rows = ViceData.watchNext(this, 4);
-            boolean fromWatchNext = rows != null && !rows.isEmpty();
-            if (!fromWatchNext) rows = recentVideoApps();
+            List<ViceData.Watch> rows = new ArrayList<>();
+            List<String> seen = new ArrayList<>();
+            List<ViceData.Watch> next = ViceData.watchNext(this, 12);
+            List<ViceData.Watch> mine = ViceData.lastWatched(this, 12);
+            List<ViceData.Watch> all = new ArrayList<>();
+            if (next != null) all.addAll(next);
+            all.addAll(mine);
+            all.sort((x, y) -> Long.compare(y.engaged, x.engaged));
+            for (ViceData.Watch w : all) {
+                if (w.pkg == null || seen.contains(w.pkg) || !entries.containsKey(w.pkg)) continue;
+                seen.add(w.pkg);
+                rows.add(w);
+                if (rows.size() == 4) break;
+            }
             for (ViceData.Watch w : rows) {
                 Entry app = entries.get(w.pkg);
                 if (w.tag == null) w.tag = app != null ? app.label.toUpperCase(Locale.ROOT) : "";
@@ -1518,37 +1572,15 @@ public class HomeActivity extends Activity {
             }
             Bitmap[] posters = new Bitmap[rows.size()];
             for (int i = 0; i < rows.size(); i++) posters[i] = ViceData.poster(this, rows.get(i).poster, px(419), px(236));
-            List<ViceData.Watch> shown = rows;
-            Log.i(ViceData.TAG, "continue watching from " + (fromWatchNext ? "Watch Next" : "recent video apps"));
-            main.post(() -> populateWatch(shown, posters));
+            Log.i(ViceData.TAG, "continue watching: " + rows.size() + " (watch next " + (next == null ? "closed" : next.size()) + ", watched " + mine.size() + ")");
+            main.post(() -> populateWatch(rows, posters));
         }, "watch").start();
-    }
-
-    /** Fallback when Watch Next is closed to us: the most recently used video apps. */
-    private List<ViceData.Watch> recentVideoApps() {
-        List<Entry> video = new ArrayList<>();
-        for (Entry e : entries.values()) {
-            if (e.builtIn || e.key.equals(getPackageName())) continue;
-            boolean isVideo = e.category == ApplicationInfo.CATEGORY_VIDEO || java.util.Arrays.asList(VIDEO_APPS).contains(e.key);
-            if (isVideo) video.add(e);
-        }
-        video.sort((a, b) -> Long.compare(b.lastUsed, a.lastUsed));
-        List<ViceData.Watch> out = new ArrayList<>();
-        for (Entry e : video) {
-            if (out.size() == 4) break;
-            ViceData.Watch w = new ViceData.Watch();
-            w.pkg = e.key;
-            w.title = e.label;
-            w.meta = e.lastUsed > 0 ? ViceData.ago(e.lastUsed) : e.subtitle;
-            w.launch = e.launch;
-            out.add(w);
-        }
-        return out;
     }
 
     private void populateWatch(List<ViceData.Watch> rows, Bitmap[] posters) {
         watchGrid.removeAllViews();
         for (int i = 0; i < rows.size(); i++) watchGrid.addView(watchCard(rows.get(i), posters[i], i));
+        watchSection.setVisibility(rows.isEmpty() ? View.GONE : View.VISIBLE);
     }
 
     private View watchCard(ViceData.Watch w, Bitmap poster, int index) {
@@ -1613,88 +1645,11 @@ public class HomeActivity extends Activity {
         item.addView(labels, below(16));
 
         item.setOnClickListener(v -> {
+            Log.i(ViceData.TAG, "continue watching: open " + w.pkg);
             if (w.launch != null) Actions.startOrSay(this, w.launch, "Couldn't open " + w.title);
+            else toast(this, "Couldn't open " + w.title);
         });
         return item;
-    }
-
-    // ---------------------------------------------------------------- smart home
-
-    private View buildHome() {
-        homeSection = section(60, 40);
-        homeCount = new Text(this, "", Vice.INTER_700, 18, 0.2f, 22, white(0.6f));
-        homeSection.addView(heading("SMART HOME", homeCount, homeCount));
-        homeGrid = new Vice.Grid(this, 6, 24, 24);
-        homeSection.addView(homeGrid, below(40));
-        populateHome();
-        return homeSection;
-    }
-
-    private void populateHome() {
-        View focused = getCurrentFocus();
-        Object focusedKey = focused != null ? focused.getTag() : null;
-        SharedPreferences p = Prefs.get(this);
-        homeGrid.removeAllViews();
-        int lightsOn = 0;
-        for (String[] d : DEVICES) {
-            boolean on = p.getBoolean("vice_dev_" + d[0], "tv_backlight".equals(d[0]));
-            if ("light".equals(d[2]) && on) lightsOn++;
-            homeGrid.addView(deviceCard(d, on));
-        }
-        homeCount.set(lightsOn + (lightsOn == 1 ? " LIGHT ON" : " LIGHTS ON"));
-        if (focusedKey != null) {
-            View again = homeGrid.findViewWithTag(focusedKey);
-            if (again != null) focus(again);
-        }
-    }
-
-    private View deviceCard(String[] d, boolean on) {
-        String kind = d[2];
-        boolean offline = "offline".equals(kind);
-        boolean lit = on && !offline && !"air".equals(kind) && !"tv".equals(kind);
-        int ink = offline ? white(0.35f) : lit ? Vice.INK : 0xFFFFFFFF;
-        Fill fill = lit ? new Fill(0, 22, Vice.linear(135, new int[] {0xFFFFB37A, 0xFFF0647F}, null))
-                : offline ? new Fill(0, 22).border(1.5f, white(0.12f))
-                : new Fill(white(0.05f), 22).border(1.5f, white(0.2f));
-        Tile card = new Tile(this, 22, fill).lift(6);
-        card.setTag("dev:" + d[0]);
-        if (!offline) {
-            card.setFocusable(true);
-            card.setClickable(true);
-            card.focusOn(card);
-            card.setOnClickListener(v -> toggle(d));
-        }
-
-        // Six across: icon on top, name and status under it (Anton 28 so the longest name fits).
-        LinearLayout inner = new LinearLayout(this);
-        inner.setOrientation(LinearLayout.VERTICAL);
-        float pad = lit ? 26 : 27.5f;
-        inner.setPadding(px(pad), px(pad), px(pad), px(pad));
-        FrameLayout box = new FrameLayout(this);
-        box.setBackground(new Fill(lit ? Vice.argb(0.15f, 42, 15, 44) : white(0.08f), 18));
-        int icon = "air".equals(kind) ? R.drawable.vice_thermo : "tv".equals(kind) ? R.drawable.vice_tv : R.drawable.vice_bulb;
-        box.addView(Vice.icon(this, icon, ink), Vice.at(px(30), px(30), Gravity.CENTER));
-        inner.addView(box, size(64, 64, 0));
-
-        inner.addView(new Text(this, d[1], Vice.ANTON, 28, 0.02f, 29.4f, ink), below(16));
-        String status = offline ? "OFFLINE" : "air".equals(kind) ? "COOLING · 22°" : "tv".equals(kind) ? "STANDBY" : on ? "ON" : "OFF";
-        inner.addView(new Text(this, status, Vice.INTER_700, 16, 0.18f, 19.5f, ink), below(4));
-        card.face.addView(inner, match());
-
-        card.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, px(190)));
-        return card;
-    }
-
-    /** Lights and the backlight switch on and off here; nothing is wired to a real home yet. */
-    private void toggle(String[] d) {
-        if (!"light".equals(d[2])) {
-            toast(this, d[1].charAt(0) + d[1].substring(1).toLowerCase(Locale.ROOT) + " isn't connected yet");
-            return;
-        }
-        SharedPreferences p = Prefs.get(this);
-        String key = "vice_dev_" + d[0];
-        p.edit().putBoolean(key, !p.getBoolean(key, "tv_backlight".equals(d[0]))).apply();
-        populateHome();
     }
 
     // ---------------------------------------------------------------- weather

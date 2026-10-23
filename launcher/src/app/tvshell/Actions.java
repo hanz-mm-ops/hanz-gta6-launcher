@@ -19,6 +19,7 @@ final class Actions {
             new ComponentName("com.newlink.cast", "com.newlink.cast.activity.MainActivity");
     private static final ComponentName MIRACAST =
             new ComponentName("com.hisilicon.miracast", "com.hisilicon.miracast.activity.WelcomeActivity");
+    private static final ComponentName TCL_MIRACAST = new ComponentName("com.tcl.miracast", "com.tcl.miracast.MainActivity");
     private static final ComponentName SCREENSAVER_NOW =
             new ComponentName("com.android.systemui", "com.android.systemui.Somnambulator");
     static final String TV_PLAYER = "com.hisilicon.tvui";
@@ -29,7 +30,7 @@ final class Actions {
     private Actions() {}
 
     static boolean hasMirroring(Context c) {
-        return exists(c, AIRPLAY) || exists(c, MIRACAST);
+        return exists(c, AIRPLAY) || exists(c, MIRACAST) || exists(c, TCL_MIRACAST);
     }
 
     private static boolean exists(Context c, ComponentName cn) {
@@ -41,8 +42,55 @@ final class Actions {
         }
     }
 
+    /** The name the device on this input gives over HDMI-CEC (e.g. "PlayStation 5"), if the TV shares it. */
+    private static String cecName(TvInputInfo info) {
+        try {
+            Object d = TvInputInfo.class.getMethod("getHdmiDeviceInfo").invoke(info);
+            if (d == null) return "";
+            Object n = d.getClass().getMethod("getDisplayName").invoke(d);
+            return n == null ? "" : n.toString();
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            return "";
+        }
+    }
+
+    /** AirPlay: the TV's own AirPlay input (TCL/MediaTek), else a stand-alone AirPlay app. */
     static boolean airplay(Context c) {
+        TvInputManager tim = c.getSystemService(TvInputManager.class);
+        if (tim != null) {
+            for (TvInputInfo info : tim.getTvInputList()) {
+                if (info.getId().toLowerCase(java.util.Locale.ROOT).contains("airplay") && switchInput(c, info.getId())) return true;
+            }
+        }
         return start(c, new Intent().setComponent(AIRPLAY));
+    }
+
+    /**
+     * The HDMI input a console is on: one that's connected and named like a console (by the TV or
+     * over HDMI-CEC), else any connected one, else the port the viewer named. Returns
+     * {id, label, "connected"|"idle"} or null when the TV has no HDMI inputs.
+     */
+    static String[] consoleInput(Context c, String[] portNames) {
+        TvInputManager tim = c.getSystemService(TvInputManager.class);
+        if (tim == null) return null;
+        String[] best = null, anyOn = null, named = null, first = null;
+        for (TvInputInfo info : tim.getTvInputList()) {
+            if (!info.isPassthroughInput() || info.getType() != TvInputInfo.TYPE_HDMI) continue;
+            CharSequence custom = info.loadCustomLabel(c);
+            String label = String.valueOf(custom != null ? custom : info.loadLabel(c));
+            String device = cecName(info);
+            boolean on = tim.getInputState(info.getId()) == TvInputManager.INPUT_STATE_CONNECTED;
+            String text = (label + " " + device).toUpperCase(java.util.Locale.ROOT);
+            boolean console = text.contains("PLAYSTATION") || text.contains("PS5") || text.contains("PS4")
+                    || text.contains("XBOX") || text.contains("SWITCH") || text.contains("NINTENDO") || text.contains("CONSOLE");
+            String shown = !device.isEmpty() ? device : HomeActivity.inputName(label);
+            String[] r = {info.getId(), shown, on ? "connected" : "idle"};
+            if (first == null) first = r;
+            if (on && console && best == null) best = r;
+            if (on && anyOn == null) anyOn = r;
+            if (!HomeActivity.inputName(label).equals(label) && named == null) named = r;
+        }
+        return best != null ? best : anyOn != null ? anyOn : named != null ? named : first;
     }
 
     /** Key for the Live TV tile on the home screen. */
@@ -88,7 +136,7 @@ final class Actions {
         items.add(new Sheet.Item("Android phone or Windows PC", "Miracast / Smart View / Cast screen",
                 c.getDrawable(R.drawable.ic_mirror)));
         return Sheet.show(host, "Screen Mirroring", items, i -> startOrSay(c,
-                new Intent().setComponent(i == 0 ? AIRPLAY : MIRACAST),
+                new Intent().setComponent(i == 0 ? AIRPLAY : exists(c, MIRACAST) ? MIRACAST : TCL_MIRACAST),
                 "Screen mirroring isn't available"));
     }
 
